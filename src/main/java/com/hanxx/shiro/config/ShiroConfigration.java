@@ -2,6 +2,7 @@ package com.hanxx.shiro.config;
 
 import com.hanxx.shiro.realms.AuthRealm;
 import com.hanxx.shiro.util.CredentialMatcher;
+import org.apache.shiro.mgt.SecurityManager;
 import org.apache.shiro.spring.security.interceptor.AuthorizationAttributeSourceAdvisor;
 import org.apache.shiro.spring.web.ShiroFilterFactoryBean;
 import org.apache.shiro.web.mgt.DefaultWebSecurityManager;
@@ -22,7 +23,7 @@ public class ShiroConfigration {
 
     // ShiroFilterFactoryBean 管理 SecurityManager
     @Bean("shiroFilter")
-    public ShiroFilterFactoryBean shiroFilter(@Qualifier("defaultWebSecurityManager") DefaultWebSecurityManager manager){
+    public ShiroFilterFactoryBean shiroFilter(@Qualifier("securityManager") SecurityManager manager){
         ShiroFilterFactoryBean bean = new ShiroFilterFactoryBean();
         bean.setSecurityManager(manager);
 
@@ -32,17 +33,23 @@ public class ShiroConfigration {
         // 权限配置 DefaultFilter.class
         LinkedHashMap<String,String> filter = new LinkedHashMap<>();
         filter.put("/index","authc");   //需要登陆
-        filter.put("/login","anon");    //不做验证
+        filter.put("/login","anon");    //不做验证user
+        filter.put("/loginuser","anon");    //都可以访问
+        filter.put("/admin","roles[admin]");    //admin角色才能访问
+        filter.put("/**","user");    //登陆就可以访问
         bean.setFilterChainDefinitionMap(filter);
         return bean;
     }
 
 
     // 使用 SecurityManager 使用 authRealm
-    @Bean("defaultWebSecurityManager")
-    public DefaultWebSecurityManager defaultWebSecurityManager(@Qualifier("authRealm") AuthRealm authRealm){
+    @Bean("securityManager")
+    public SecurityManager securityManager(@Qualifier("authRealm") AuthRealm authRealm){
+
         DefaultWebSecurityManager manager = new DefaultWebSecurityManager();
+
         manager.setRealm(authRealm);
+
         return manager;
     }
 
@@ -61,7 +68,7 @@ public class ShiroConfigration {
 
     // shiro 与 spring
     @Bean
-    public AuthorizationAttributeSourceAdvisor authorizationAttributeSourceAdvisor(@Qualifier("defaultWebSecurityManager") DefaultWebSecurityManager manager){
+    public AuthorizationAttributeSourceAdvisor authorizationAttributeSourceAdvisor(@Qualifier("securityManager") SecurityManager manager){
         AuthorizationAttributeSourceAdvisor advisor = new AuthorizationAttributeSourceAdvisor();
         advisor.setSecurityManager(manager);
         return advisor;

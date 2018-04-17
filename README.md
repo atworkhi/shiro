@@ -58,7 +58,7 @@ spring boot 1.5x apache shiro 1.2.3
 # 数据库配置
 spring.datasource.type=com.alibaba.druid.pool.DruidDataSource
 spring.datasource.driver-class-name=com.mysql.jdbc.Driver
-spring.datasource.url=jdbc:mysql://localhost:3306/test?characterEncoding=UTF-8
+spring.datasource.url=jdbc:mysql://localhost:3306/shiro?characterEncoding=UTF-8&useSSL=true
 spring.datasource.username=root
 spring.datasource.password=root
 ```
@@ -170,14 +170,14 @@ public class UserServiceImpl implements UserService{
 ```$xslt
 <mapper namespace="com.hanxx.shiro.mapper.UserMapper">
     <resultMap id="usermap" type="com.hanxx.shiro.model.User">
-        <id property="uid" column="uid"></id>
+        <id property="id" column="uid"></id>
         <result property="username" column="username" />
         <result property="password" column="password" />
         <collection property="roles" ofType="com.hanxx.shiro.model.Role">
-            <id property="rid" column="rid"></id>
-            <result property="rname" column="rname" />
+            <id property="id" column="rid"></id>
+            <result property="name" column="rname" />
             <collection property="permissions" ofType="com.hanxx.shiro.model.Permission">
-                <id property="pid" column="pid"></id>
+                <id property="id" column="pid"></id>
                 <result property="name" column="name" />
                 <result property="url" column="url" />
             </collection>
@@ -185,7 +185,13 @@ public class UserServiceImpl implements UserService{
     </resultMap>
 
     <select id="findByUsername" parameterType="String" resultMap="usermap">
-
+         SELECT u.*, r.*, p.*
+                FROM USER u
+                  INNER JOIN user_role ur on ur.uid = u.uid
+                  INNER JOIN role r ON r.rid = ur.rid
+                  INNER JOIN permission_role pr ON pr.rid = r.rid
+                  INNER JOIN permission p ON pr.pid = p.pid
+                  WHERE u.username = #{username}
     </select>
 </mapper>
 ```
@@ -199,7 +205,7 @@ mybatis.type-aliases-package=com.hanxx.shiro.model;
 ```$xslt
 @SpringBootApplication
 // 扫描mapper
-@MapperScan(basePackages = {"package com.hanxx.shiro.mapper"})
+@MapperScan(basePackages = {"com.hanxx.shiro.mapper"})
 // 扫描注解
 @ComponentScan
 ```
@@ -285,7 +291,7 @@ public class ShiroConfigration {
 
     // ShiroFilterFactoryBean 管理 SecurityManager
     @Bean("shiroFilter")
-    public ShiroFilterFactoryBean shiroFilter(@Qualifier("defaultWebSecurityManager") DefaultWebSecurityManager manager){
+    public ShiroFilterFactoryBean shiroFilter(@Qualifier("securityManager") SecurityManager manager){
         ShiroFilterFactoryBean bean = new ShiroFilterFactoryBean();
         bean.setSecurityManager(manager);
 
@@ -302,8 +308,8 @@ public class ShiroConfigration {
 
 
     // 使用 SecurityManager 使用 authRealm
-    @Bean("defaultWebSecurityManager")
-    public DefaultWebSecurityManager defaultWebSecurityManager(@Qualifier("authRealm") AuthRealm authRealm){
+    @Bean("securityManager")
+    public SecurityManager securityManager(@Qualifier("authRealm") AuthRealm authRealm){
         DefaultWebSecurityManager manager = new DefaultWebSecurityManager();
         manager.setRealm(authRealm);
         return manager;
@@ -324,7 +330,7 @@ public class ShiroConfigration {
 
     // shiro 与 spring
     @Bean
-    public AuthorizationAttributeSourceAdvisor authorizationAttributeSourceAdvisor(@Qualifier("defaultWebSecurityManager") DefaultWebSecurityManager manager){
+    public AuthorizationAttributeSourceAdvisor authorizationAttributeSourceAdvisor(@Qualifier("securityManager") SecurityManager manager){
         AuthorizationAttributeSourceAdvisor advisor = new AuthorizationAttributeSourceAdvisor();
         advisor.setSecurityManager(manager);
         return advisor;
@@ -336,4 +342,92 @@ public class ShiroConfigration {
         return proxyCreator;
     }
 }
+```
+创建controller：
+```
+@RequestMapping("/login")
+    public String login(){
+        return "login";
+    }
+
+    @RequestMapping("/index")
+    public String index(){
+        return "index";
+    }
+
+    @RequestMapping("/loginuser")
+    public String loginUser(@RequestParam("username") String username,
+                            @RequestParam("password") String password,
+                            HttpSession session){
+        // 需要用账号密码转成token实例
+        UsernamePasswordToken token = new UsernamePasswordToken(username, password);
+        Subject subject = SecurityUtils.getSubject();
+        try {
+            // 登陆
+            subject.login(token);
+            // 获取登陆用户
+            User user = (User)subject.getPrincipal();
+            session.setAttribute("user",user);
+            return "index";
+        } catch (Exception e){
+            return "login";
+        }
+    }
+```
+创建jsp配置与jsp页面：
+```
+# jsp
+spring.mvc.view.prefix=/pages/
+spring.mvc.view.suffix=.jsp
+
+<form action="/loginuser" method="post">
+    <input type="text" name="username" />
+    <input type="password" name="password" />
+    <input type="submit" value="提交" />
+</form>
+```
+
+登陆验证已完成：
+
+权限配置：
+```
+权限配置文件中增加啊登陆界面都可以访问 与其他界面需要登陆访问
+filter.put("/loginuser","anon");    //都可以访问
+filter.put("/**","user");    //登陆就可以访问
+```
+不同角色访问不同接口：
+```
+filter.put("/admin","roles[admin]");    //admin角色才能访问
+配置AuthRealm: 把角色添加进去
+    // 授权
+    @Override
+    protected AuthorizationInfo doGetAuthorizationInfo(PrincipalCollection principalCollection) {
+        // 遍历
+        User user = (User) principalCollection.fromRealm(this.getClass().getName()).iterator().next();
+        List<String> plist = new ArrayList<>();  //权限
+        List<String> rlist = new ArrayList<>(); //角色
+        Set<Role> roleSet = user.getRoles();
+        //如果觉得不为空则遍历
+        if(CollectionUtils.isEmpty(roleSet)){
+            for (Role r :roleSet){
+                rlist.add(r.getName()); //把觉得名放进去
+                Set<Permission> permissionSet = r.getPermissions();
+                //如果权限不为空遍历权限
+                if(!CollectionUtils.isEmpty(permissionSet)){
+                    for (Permission p : permissionSet){
+                        //获取权限并添加
+                        plist.add(p.getName());
+                    }
+                }
+            }
+        }
+        SimpleAuthorizationInfo info = new SimpleAuthorizationInfo();
+        info.addStringPermissions(plist);
+        info.addRoles(rlist);
+        return info;
+    }
+```
+
+```
+
 ```

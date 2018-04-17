@@ -6,7 +6,7 @@
 	<groupId>com.hanxx</groupId>
 	<artifactId>shiro</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
-	<packaging>jar</packaging>
+	<packaging>war</packaging>
 
 	<name>shiro</name>
 	<description>Apache shiro project for Spring Boot</description>

@@ -7,7 +7,7 @@ import org.springframework.context.annotation.ComponentScan;
 
 @SpringBootApplication
 // 扫描mapper
-@MapperScan(basePackages = {"package com.hanxx.shiro.mapper"})
+@MapperScan(basePackages = {"com.hanxx.shiro.mapper"})
 // 扫描注解
 @ComponentScan
 public class ShiroApplication {

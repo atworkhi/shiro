@@ -16,8 +16,10 @@ public class CredentialMatcher extends SimpleCredentialsMatcher{
         UsernamePasswordToken usernamePasswordToken = (UsernamePasswordToken) token;
         // token的密码
         String password = new String(usernamePasswordToken.getPassword());
+        // System.out.println("pass: " +password);
         // 数据库密码
         String dbpassword = (String)info.getCredentials();
+        // System.out.println("db: "+dbpassword);
         // 校验
         return this.equals(password,dbpassword);
     }
