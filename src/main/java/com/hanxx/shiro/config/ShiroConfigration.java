@@ -2,6 +2,7 @@ package com.hanxx.shiro.config;
 
 import com.hanxx.shiro.realms.AuthRealm;
 import com.hanxx.shiro.util.CredentialMatcher;
+import org.apache.shiro.cache.MemoryConstrainedCacheManager;
 import org.apache.shiro.mgt.SecurityManager;
 import org.apache.shiro.spring.security.interceptor.AuthorizationAttributeSourceAdvisor;
 import org.apache.shiro.spring.web.ShiroFilterFactoryBean;
@@ -32,11 +33,13 @@ public class ShiroConfigration {
         bean.setUnauthorizedUrl("/unauthorized");
         // 权限配置 DefaultFilter.class
         LinkedHashMap<String,String> filter = new LinkedHashMap<>();
-        filter.put("/index","authc");   //需要登陆
-        filter.put("/login","anon");    //不做验证user
-        filter.put("/loginuser","anon");    //都可以访问
-        filter.put("/admin","roles[admin]");    //admin角色才能访问
-        filter.put("/**","user");    //登陆就可以访问
+        filter.put("/index","authc");   // 需要登陆
+        filter.put("/login","anon");    // 不做验证user
+        filter.put("/loginuser","anon");    // 都可以访问
+        filter.put("/admin","roles[admin]");    // admin角色才能访问
+        filter.put("/update","perms[update]");    // 需要有update权限才能访问
+        filter.put("/druid/**","anon");    // 配置druid/*路径都不允许访问，增加对数据库监控
+        filter.put("/**","user");    // 登陆就可以访问
         bean.setFilterChainDefinitionMap(filter);
         return bean;
     }
@@ -57,6 +60,8 @@ public class ShiroConfigration {
     @Bean("authRealm")
     public AuthRealm authRealm(@Qualifier("credentialMatcher") CredentialMatcher matcher){
         AuthRealm authRealm = new AuthRealm();
+        // 使用缓存 缓存的内存
+        authRealm.setCacheManager(new MemoryConstrainedCacheManager());
         authRealm.setCredentialsMatcher(matcher);
         return authRealm;
     }

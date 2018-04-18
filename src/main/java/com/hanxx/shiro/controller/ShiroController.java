@@ -20,6 +20,10 @@ import javax.servlet.http.HttpSession;
 @Controller
 public class ShiroController {
 
+    @RequestMapping("/unauthorized")
+    public String unauthorized(){
+        return "403";
+    }
     @RequestMapping("/login")
     public String login(){
         return "login";
@@ -43,6 +47,12 @@ public class ShiroController {
     @ResponseBody
     public String admin(){
         return "admin success";
+    }
+
+    @RequestMapping("/update")
+    @ResponseBody
+    public String edit(){
+        return "update success";
     }
 
     @RequestMapping("/loginuser")

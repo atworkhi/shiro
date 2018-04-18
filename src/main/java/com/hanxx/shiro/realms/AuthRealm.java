@@ -30,20 +30,19 @@ public class AuthRealm extends AuthorizingRealm{
     protected AuthorizationInfo doGetAuthorizationInfo(PrincipalCollection principalCollection) {
         // 遍历
         User user = (User) principalCollection.fromRealm(this.getClass().getName()).iterator().next();
-        System.out.println("-------"+user);
         List<String> plist = new ArrayList<>();  //权限
         List<String> rlist = new ArrayList<>(); //角色
         Set<Role> roleSet = user.getRoles();
-        //如果觉得不为空则遍历
-        if(CollectionUtils.isEmpty(roleSet)){
+        // 如果角色不为空则遍历
+        if(!roleSet.isEmpty()){
             for (Role r :roleSet){
-                rlist.add(r.getName()); //把觉得名放进去
+                rlist.add(r.getName()); //把角色名放进去
                 System.out.println("角色名称："+r.getName());
                 Set<Permission> permissionSet = r.getPermissions();
                 //如果权限不为空遍历权限
-                if(!CollectionUtils.isEmpty(permissionSet)){
+                if(!permissionSet.isEmpty()){
                     for (Permission p : permissionSet){
-                        //获取权限并添加
+                        // 获取权限并添加
                         plist.add(p.getName());
                     }
                 }

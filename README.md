@@ -1,5 +1,5 @@
 **apache shiro**
-### 环境搭建：
+### 环境搭建： RBAC模型
 spring boot 1.5x apache shiro 1.2.3
 ```$xslt
 <!--导入apache shiro-->
@@ -427,7 +427,119 @@ filter.put("/admin","roles[admin]");    //admin角色才能访问
         return info;
     }
 ```
-
+添加无权限访问403页面：
 ```
+ @RequestMapping("/unauthorized")
+    public String unauthorized(){
+        return "403";
+    }
+    定义403页面
+```
+不同权限访不同的接口
+```
+ filter.put("/update","perms[update]");    // 需要有update权限才能访问
+ 
+ @RequestMapping("/update")
+     @ResponseBody
+     public String edit(){
+         return "update success";
+     }
+     自定义 realm
+      protected AuthorizationInfo doGetAuthorizationInfo(PrincipalCollection principalCollection) {
+             // 遍历
+             User user = (User) principalCollection.fromRealm(this.getClass().getName()).iterator().next();
+             List<String> plist = new ArrayList<>();  //权限
+             List<String> rlist = new ArrayList<>(); //角色
+             Set<Role> roleSet = user.getRoles();
+             // 如果角色不为空则遍历
+             if(!roleSet.isEmpty()){
+                 for (Role r :roleSet){
+                     rlist.add(r.getName()); //把角色名放进去
+                     System.out.println("角色名称："+r.getName());
+                     Set<Permission> permissionSet = r.getPermissions();
+                     //如果权限不为空遍历权限
+                     if(!permissionSet.isEmpty()){
+                         for (Permission p : permissionSet){
+                             // 获取权限并添加
+                             plist.add(p.getName());
+                         }
+                     }
+                 }
+             }
+             SimpleAuthorizationInfo info = new SimpleAuthorizationInfo();
+             info.addStringPermissions(plist);
+             info.addRoles(rlist);
+             return info;
+         }
+```
+使用缓存：
+```
+缓存配置
+ @Bean("authRealm")
+    public AuthRealm authRealm(@Qualifier("credentialMatcher") CredentialMatcher matcher){
+        AuthRealm authRealm = new AuthRealm();
+        // 使用缓存 缓存的内存
+        authRealm.setCacheManager(new MemoryConstrainedCacheManager());
+        authRealm.setCredentialsMatcher(matcher);
+        return authRealm;
+    }
+```
+使用druid实现对数据库的监控：
+```
+filter.put("/druid/*","anon");    // 配置druid/*路径都不允许访问，增加对数据库监控
+/**
+ *  数据库监控
+ * @Author hanxx
+ * @Date 2018/4/18 10:48
+ */
+@Configuration
+public class DruidConfiguration {
 
+    @Bean
+    public ServletRegistrationBean servletRegistrationBean(){
+        ServletRegistrationBean servletRegistrationBean = new ServletRegistrationBean(new StatViewServlet(),"/druid/*");
+        // 白名单
+        servletRegistrationBean.addInitParameter("allow","127.0.0.1");
+        // ip黑名单 存在共同时 deny优先 allow
+        servletRegistrationBean.addInitParameter("deny","192.168.1.100");
+        // 登陆查看信息的账号密码
+        servletRegistrationBean.addInitParameter("loginUsername","druid");
+        servletRegistrationBean.addInitParameter("loginPassword","123456");
+        // 是否能够重置数据
+        servletRegistrationBean.addInitParameter("resetEnable","false");
+        return servletRegistrationBean;
+    }
+
+    @Bean
+    public FilterRegistrationBean statFilter() {
+        FilterRegistrationBean filterRegistrationBean = new FilterRegistrationBean(new WebStatFilter());
+        // 添加过滤规则
+        filterRegistrationBean.addUrlPatterns("/*");
+        // 添加不需要忽略的格式信息
+        filterRegistrationBean.addInitParameter("exclusions","*.js,*.gif,*.jpg,*.png,*.css,*.ico,/druid/*");
+        return filterRegistrationBean;
+    }
+
+    @Bean
+    PersistenceExceptionTranslationPostProcessor postProcessor(){
+        return new PersistenceExceptionTranslationPostProcessor();
+    }
+    // 配置数据库链接基本信息
+    @Bean(name="dataSource")
+    @Primary
+    @ConfigurationProperties(prefix="spring.datasource")
+    public DataSource dataSource(){
+        return DataSourceBuilder.create().type(com.alibaba.druid.pool.DruidDataSource.class).build();
+    }
+    // mapper文件
+    @Bean
+    public SqlSessionFactoryBean sqlSessionFactoryBean(@Qualifier("dataSource")DataSource dataSource) throws Exception{
+        SqlSessionFactoryBean bean =new SqlSessionFactoryBean();
+        bean.setDataSource(dataSource);
+        PathMatchingResourcePatternResolver resolver = new PathMatchingResourcePatternResolver();
+        bean.setMapperLocations(resolver.getResources("classpath:/mapper/*.xml"));
+        return bean;
+    }
+}
+访问主页 ：/druid/login.html 输入定义的密码可以进入druid监控页面
 ```
